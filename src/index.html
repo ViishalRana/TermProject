@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TermProject</title>
+    <script src="../libs/three.js"></script>
+    <script src="../libs/dat.gui.min.js"></script>
+    <script src="../libs/stats.min.js"></script>
+    <script src="../libs/chroma.min.js"></script>
+    <script src="../libs/perlin.js"></script>
+    <script src="../libs/OrbitControls.js"></script>
+    <script src="../libs/EffectComposer.js"></script>
+    <script src="../libs/RenderPass.js"></script>
+    <script src="../libs/CopyShader.js"></script>
+    <script src="../libs/ShaderPass.js"></script>
+    <script src="../libs/MaskPass.js"></script>
+    <script src="../libs/proctree.js"></script>
+    <style>
+        body {
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+        
+    </style>
+    <style>
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        #instructions {
+            width: 100%;
+            height: 100%;
+
+            display: -webkit-box;
+            display: -moz-box;
+            display: box;
+
+            -webkit-box-orient: horizontal;
+            -moz-box-orient: horizontal;
+            box-orient: horizontal;
+
+            -webkit-box-pack: center;
+            -moz-box-pack: center;
+            box-pack: center;
+
+            -webkit-box-align: center;
+            -moz-box-align: center;
+            box-align: center;
+
+            color: #ffffff;
+            text-align: center;
+            font-family: Arial;
+            font-size: 14px;
+            line-height: 24px;
+
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="blocker">
+
+        <div id="instructions">
+            <span style="font-size:36px">Click to play</span>
+            <br /><br />
+            Move: ArrowKeys<br/>
+            
+            Look: MOUSE
+        </div>
+
+    </div>
+    <script src="../libs/character.js" type="module">
+    </script>
+    <!-- <script>
+    
+    //------------------------------------------------------
+    // Some globally shared variables
+    //------------------------------------------------------
+    
+    // global variables
+    var MAX_HEIGHT = 25;
+    var renderer;
+    var scene;
+    var camera;
+    var control;
+    var stats;
+    var scale = chroma.scale(['blue','green','red']).domain([0,MAX_HEIGHT]);
+    var cloudMesh;
+    var skyMesh;
+    var light1;
+    var ls1;
+    var mainLight;
+    var sound;
+    var is_day=true;
+    
+    //------------------------------------------------------
+    // Set up the main scene
+    //------------------------------------------------------
+    
+    /**
+     * Initializes the scene, camera and objects. Called when the window is
+     * loaded by using window.onload (see below)
+     */
+    function init() {
+    
+        // create a scene, that will hold all our elements such as objects, cameras and lights.
+        scene = new THREE.Scene();
+    
+        // create a camera, which defines where we're looking at.
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    
+        // create a render, sets the background color and the size
+        renderer = new THREE.WebGLRenderer();
+        renderer.setClearColor(0x000000, 1.0);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMapEnabled = true;
+    
+        // position and point the camera to the center of the scene
+        controls = new THREE.OrbitControls( camera, renderer.domElement);
+    
+        camera.position.x = 0;
+        camera.position.y = 10;
+        camera.position.z = 10;
+        camera.lookAt(100,10,-camera.position.z);
+        //camera.lookAt(0,500,0);
+        // add spotlight for the shadows
+        var spotLight = new THREE.SpotLight(0xffffff);
+        //spotLight.position.set(10, 300, 10);
+    
+        //scene.add(spotLight);
+        mainLight=new THREE.AmbientLight(0xffffff,0.2);
+        scene.add(mainLight);
+    
+        addStatsObject();
+    
+        // add the output of the renderer to the html element
+        document.body.appendChild(renderer.domElement);
+    
+        // set up the example specific stuff
+        var surfaceG=new THREE.PlaneGeometry(1000,1000);
+        var surfaceM= new THREE.MeshPhongMaterial({ map: new THREE.TextureLoader().load('../assets/textures/surface.jpg'), side: THREE.DoubleSide });
+        var surface= new THREE.Mesh(surfaceG,surfaceM);
+        scene.add(surface);
+        surface.rotation.x=Math.PI/2;
+        surface.position.y=0;
+    
+        var cloudGeometry = new THREE.SphereGeometry(600,50,50);
+        var cloudMaterial = createCloudMaterial();
+        cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        cloudMesh.name = 'clouds';
+        scene.add(cloudMesh);
+    
+        var skyGeometry = new THREE.SphereGeometry(620,50,50);
+        var skyMaterial = new THREE.MeshBasicMaterial({color: 0x87CEEB , side:THREE.DoubleSide});
+        skyMesh = new THREE.Mesh(skyGeometry,skyMaterial);
+        scene.add(skyMesh);
+    
+        light1 = new THREE.DirectionalLight(0xFDFBD3 , 1.5);
+        light1.position.y=580;
+        scene.add(light1);
+        var ls1Geometry = new THREE.SphereGeometry(15,50,50);
+        var ls1Material = new THREE.MeshBasicMaterial( { color:0xFDFBD3 } );
+        ls1 = new THREE.Mesh( ls1Geometry, ls1Material);
+        ls1.position.set( light1.position.x, light1.position.y, light1.position.z);
+        scene.add( ls1 );
+        
+        const listener = new THREE.AudioListener();
+        camera.add( listener );
+    
+        // create a global audio source
+        sound = new THREE.Audio( listener );
+    
+        // load a sound and set it as the Audio object's buffer
+        var audioLoader = new THREE.AudioLoader();
+        audioLoader.load( '../assets/audio/wind.mp3', function( buffer ) {
+            sound.setBuffer( buffer );
+            sound.setLoop( true );
+            sound.setVolume( 0.2 );
+            sound.play();
+        });
+    
+    
+    
+        create3DTerrain(50, 200, 2.5, 2.5, MAX_HEIGHT-5,370,0,0);
+        create3DTerrain(50, 200, 2.5, 2.5, MAX_HEIGHT-5,370,0,-500);
+        create3DTerrain(50, 200, 2.5, 2.5, MAX_HEIGHT-5,-500,0,0);
+        create3DTerrain(50, 200, 2.5, 2.5, MAX_HEIGHT-5,-500,0,-500);
+        create3DTerrain(200, 50, 2.5, 2.5, MAX_HEIGHT-5,-500,0,-500);
+        create3DTerrain(200, 50, 2.5, 2.5, MAX_HEIGHT-5,0,0,-500);
+        create3DTerrain(200, 50, 2.5, 2.5, MAX_HEIGHT-5,-500,0,380);
+        create3DTerrain(200, 50, 2.5, 2.5, MAX_HEIGHT-5,0,0,380);
+    
+        // call the render function, after the first render, interval is determined
+        // by requestAnimationFrame
+        render();
+    }
+    
+    //------------------------------------------------------
+    // Functions specific to this example
+    //------------------------------------------------------
+    function createCloudMaterial() {
+     var cloudTexture = THREE.ImageUtils.loadTexture("../assets/textures/planets/fair_clouds_4k.png");
+    //var cloudTexture = THREE.ImageUtils.loadTexture("../assets/textures/planets/earthcloudmap.jpg");
+    
+    var cloudMaterial = new THREE.MeshBasicMaterial();
+        cloudMaterial.map = cloudTexture;
+        cloudMaterial.side = THREE.DoubleSide;
+        cloudMaterial.transparent = true;
+    
+        return cloudMaterial;
+    }
+    
+    function create3DTerrain(width, depth, spacingX, spacingZ, height,px,py,pz) {
+    
+        var date = new Date();
+        noise.seed(date.getMilliseconds());
+    
+    
+        // first create all the individual vertices
+        var geometry = new THREE.Geometry();
+        for (var z = 0 ; z < depth ; z++) {
+            for (var x = 0 ; x < width ; x++) {
+                var yValue = Math.abs(noise.perlin2(x/7, z/7) * height*2);
+                var vertex = new THREE.Vector3(x*spacingX, yValue,z*spacingZ);
+                geometry.vertices.push(vertex);
+            }
+        }
+    
+        // next we need to define the faces. Which are triangles
+        // we create a rectangle between four vertices, and we do
+        // that as two triangles.
+        for (var z = 0 ; z < depth-1 ; z++) {
+            for (var x = 0 ; x < width-1 ; x++) {
+                // we need to point to the position in the array
+                // a - - b
+                // |  x  |
+                // c - - d
+                var a = x + z*width;
+                var b = (x+1) + (z * width);
+                var c = x + ((z+1) * width);
+                var d = (x+1) + ((z+1) * width);
+    
+                // define the uvs for the vertices we just created.
+                var uva = new THREE.Vector2( x / (width-1) ,1 - z / (depth - 1) );
+                var uvb = new THREE.Vector2( (x + 1) / (width-1) ,1 - z / (depth - 1) );
+                var uvc = new THREE.Vector2( x / (width-1) ,1 - (z + 1) / (depth - 1) );
+                var uvd = new THREE.Vector2( (x + 1) / (width-1) ,1 - (z + 1) / (depth - 1) );
+    
+                var face1 = new THREE.Face3(b, a, c );
+                var face2 = new THREE.Face3(c ,d, b );
+    
+                face1.color = new THREE.Color(scale(getHighPoint(geometry, face1)).hex());
+                face2.color = new THREE.Color(scale(getHighPoint(geometry, face2)).hex())
+    
+                geometry.faces.push(face1);
+                geometry.faces.push(face2);
+    
+                geometry.faceVertexUvs[ 0 ].push( [ uvb, uva, uvc ] );
+                geometry.faceVertexUvs[ 0 ].push( [ uvc, uvd, uvb ] );
+            }
+        }
+    
+    
+    
+        // compute the normals
+        geometry.computeVertexNormals(true);
+        geometry.computeFaceNormals();
+    
+        // setup the material
+        var mat = new THREE.MeshPhongMaterial();
+        mat.map = THREE.ImageUtils.loadTexture("../assets/textures/wood_1-1024x1024.png");
+    //    mat.map = THREE.ImageUtils.loadTexture("../assets/textures/debug.jpg");
+    
+        // create the mesh
+        var groundMesh = new THREE.Mesh(geometry,mat);
+        groundMesh.translateX(px);
+        groundMesh.translateZ(pz);
+        groundMesh.translateY(-3);
+        groundMesh.name = 'terrain';
+    
+        scene.add(groundMesh);
+    }
+    
+    function getHighPoint(geometry, face) {
+    
+        var v1 = geometry.vertices[face.a].y;
+        var v2 = geometry.vertices[face.b].y;
+        var v3 = geometry.vertices[face.c].y;
+    
+        return Math.max(v1, v2, v3);
+    }
+    
+    //------------------------------------------------------
+    // Main render loop
+    //------------------------------------------------------
+    
+    
+    /**
+     * Called when the scene needs to be rendered. Delegates to requestAnimationFrame
+     * for future renders
+     */
+    function render() {
+        // update the camera
+    //        var rotSpeed = control.rotationSpeed;
+    //        camera.position.x = camera.position.x * Math.cos(rotSpeed) + camera.position.z * Math.sin(rotSpeed);
+    //        camera.position.z = camera.position.z * Math.cos(rotSpeed) - camera.position.x * Math.sin(rotSpeed);
+    //        camera.lookAt(scene.position);
+    
+        // update stats
+        cloudMesh.rotation.y+=0.0001;
+        //camera.rotation.y-=0.001;
+        camera.rotation.x+=0.001;
+        //camera.position.z-=0.001;
+        //camera.lookAt(100,70,-camera.position.z);
+    
+        var time= Date.now() * 0.0005;
+        light1.position.x=light1.position.x*Math.cos(Math.PI*0.1/180) + light1.position.y*Math.sin(Math.PI*0.1/180);
+        light1.position.y= -light1.position.x*Math.sin(Math.PI*0.1/180) +light1.position.y*Math.cos(Math.PI*0.1/180);
+        ls1.position.set( light1.position.x, light1.position.y, light1.position.z);
+        
+        stats.update();
+        // and render the scene
+        renderer.render(scene, camera);
+        if(is_day==true){
+            //sound.play();
+        }
+    
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+    }
+    
+    
+    //------------------------------------------------------
+    // Some generic helper functions
+    //------------------------------------------------------
+    
+    /**
+     * Create the control object, based on the supplied configuration
+     *
+     * @param controlObject the configuration for this control
+     */
+    function addControlGui(controlObject) {
+        var gui = new dat.GUI();
+        gui.add(controlObject,'toFaceMaterial');
+        gui.add(controlObject,'toNormalMaterial');
+        gui.add(controlObject,'smoothShading').onChange(controlObject.onSmoothShadingChange);
+    }
+    
+    /**
+     * Add the stats object to the top left border
+     */
+    function addStatsObject() {
+        stats = new Stats();
+        stats.setMode(0);
+    
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+    
+        document.body.appendChild( stats.domElement );
+    }
+    
+    
+    /**
+     * Function handles the resize event. This make sure the camera and the renderer
+     * are updated at the correct moment.
+     */
+    function handleResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    //------------------------------------------------------
+    // Init the scene and register the resize handler
+    //------------------------------------------------------
+    
+    // calls the init function when the window is done loading.
+    window.onload = init;
+    // calls the handleResize function when the window is resized
+    window.addEventListener('resize', handleResize, false);
+    
+    setInterval(function(){
+        if(is_day==true){
+            sound.pause();
+            is_day=false;
+        }
+        else{
+            sound.play();
+            is_day=true;}
+    },13000);
+    
+    </script> -->
+    
+</body>
+</html>
